@@ -59,9 +59,7 @@ func SendPCM(v *discordgo.VoiceConnection, pcm <-chan []int16) {
 		return
 	}
 
-	var err error
-
-	opusEncoder, err = gopus.NewEncoder(frameRate, channels, gopus.Audio)
+	opusEncoder, err := gopus.NewEncoder(frameRate, channels, gopus.Audio)
 
 	if err != nil {
 		OnError("NewEncoder Error", err)
@@ -69,7 +67,6 @@ func SendPCM(v *discordgo.VoiceConnection, pcm <-chan []int16) {
 	}
 
 	for {
-
 		// read pcm from chan, exit if channel is closed.
 		recv, ok := <-pcm
 		if !ok {
@@ -140,16 +137,16 @@ func ReceivePCM(v *discordgo.VoiceConnection, c chan *discordgo.Packet) {
 // PlayAudioFile will play the given filename to the already connected
 // Discord voice server/channel.  voice websocket and udp socket
 // must already be setup before this will work.
-func PlayAudioFile(v *discordgo.VoiceConnection, filename string, stop <-chan bool) {
-	fmt.Println("this is a playaudiofile test")
+func PlayAudioFile(v *discordgo.VoiceConnection, filename string, stop chan bool) {
 	// Create a shell command "object" to run.
 	run := exec.Command("ffmpeg", "-i", filename, "-f", "s16le", "-ar", strconv.Itoa(frameRate), "-ac", strconv.Itoa(channels), "pipe:1")
+
+	//Output of some kind?
 	ffmpegout, err := run.StdoutPipe()
 	if err != nil {
 		OnError("StdoutPipe Error", err)
 		return
 	}
-
 	ffmpegbuf := bufio.NewReaderSize(ffmpegout, 16384)
 
 	// Starts the ffmpeg command
@@ -158,28 +155,25 @@ func PlayAudioFile(v *discordgo.VoiceConnection, filename string, stop <-chan bo
 		OnError("RunStart Error", err)
 		return
 	}
-
 	// prevent memory leak from residual ffmpeg streams
 	defer run.Process.Kill()
 
-	//when stop is sent, kill ffmpeg
+	//when stop is sent, kill ffmpeg command
 	go func() {
-		for {
-			select {
-			case <- stop:
-				fmt.Println("stop has been recieved")
-				err = run.Process.Kill()
-				return
-			}
-		}
+		temp := <-stop
+		if temp{
+			fmt.Println("stop has been recieved")
+			err = run.Process.Kill()
+			return
+		}	
 	}()
 
+	//need this for the voice connection weebsocket (nothing can be sent on the socket other wise?)
 	// Send "speaking" packet over the voice websocket
 	err = v.Speaking(true)
 	if err != nil {
 		OnError("Couldn't set speaking", err)
 	}
-
 	// Send not "speaking" packet over the websocket when we finish
 	defer func() {
 		err := v.Speaking(false)
@@ -200,7 +194,7 @@ func PlayAudioFile(v *discordgo.VoiceConnection, filename string, stop <-chan bo
 	for {
 		// read data from ffmpeg stdout
 		audiobuf := make([]int16, frameSize*channels)
-		err = binary.Read(ffmpegbuf, binary.LittleEndian, &audiobuf)
+		err = binary.Read(ffmpegbuf, binary.LittleEndian, &audiobuf)	
 		if err == io.EOF || err == io.ErrUnexpectedEOF {
 			return
 		}
@@ -211,7 +205,7 @@ func PlayAudioFile(v *discordgo.VoiceConnection, filename string, stop <-chan bo
 
 		// Send received PCM to the sendPCM channel
 		select {
-		case send <- audiobuf:
+		case send <- audiobuf:			//im guessing this is hwere the audio is actually streamed to the bot
 		case <-close:
 			return
 		}
