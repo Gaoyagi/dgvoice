@@ -160,11 +160,14 @@ func PlayAudioFile(v *discordgo.VoiceConnection, filename string, stop chan bool
 
 	//when stop is sent, kill ffmpeg command
 	go func() {
-		temp := <-stop
-		if temp{
-			fmt.Println("stop has been recieved")
-			err = run.Process.Kill()
-			return
+		select {
+		case <-stop:
+			temp := <-stop
+			if temp{
+				fmt.Println("stop has been recieved")
+				err = run.Process.Kill()
+				return
+			}	
 		}	
 	}()
 
