@@ -162,13 +162,9 @@ func PlayAudioFile(v *discordgo.VoiceConnection, filename string, stop chan bool
 	go func() {
 		select {
 		case <-stop:
-			temp := <-stop
-			//if the recieved value is true, kill
-			if temp {
-				fmt.Println("stop has been recieved")
-				err = run.Process.Kill()
-				return
-			}
+			fmt.Println("stop has been recieved")
+			err = run.Process.Kill()
+			return	
 		}
 	}()
 
@@ -198,7 +194,7 @@ func PlayAudioFile(v *discordgo.VoiceConnection, filename string, stop chan bool
 	for {
 		// read data from ffmpeg stdout
 		audiobuf := make([]int16, frameSize*channels)
-		err = binary.Read(ffmpegbuf, binary.LittleEndian, &audiobuf)
+		err = binary.Read(ffmpegbuf, binary.LittleEndian, &audiobuf)	
 		if err == io.EOF || err == io.ErrUnexpectedEOF {
 			return
 		}
@@ -209,7 +205,7 @@ func PlayAudioFile(v *discordgo.VoiceConnection, filename string, stop chan bool
 
 		// Send received PCM to the sendPCM channel
 		select {
-		case send <- audiobuf: //im guessing this is hwere the audio is actually streamed to the bot
+		case send <- audiobuf:			//im guessing this is hwere the audio is actually streamed to the bot
 		case <-close:
 			return
 		}
